@@ -43,13 +43,14 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </button>
       )}
 
-      <div
-        className={`fixed top-1/2 right-0 z-30 w-[380px] max-w-[92vw] -translate-y-1/2 rounded-l-lg border shadow-lg transition-transform duration-200 ${
-          isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-300 text-gray-800'
-        }`}
-        style={{ transform: `translateY(-50%) translateX(${isOpen ? '0' : '100%'})` }}
-        aria-expanded={isOpen}
-      >
+      <div className="fixed inset-y-0 right-0 z-30 flex items-center pointer-events-none">
+        <div
+          className={`pointer-events-auto w-[380px] max-w-[92vw] rounded-l-lg border shadow-lg transition-transform duration-200 ${
+            isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-300 text-gray-800'
+          }`}
+          style={{ transform: `translateX(${isOpen ? '0' : '100%'})` }}
+          aria-expanded={isOpen}
+        >
         {/* Flap handle when open */}
         {isOpen && (
           <button
@@ -141,6 +142,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
         {route && (
           <LegList isDarkMode={isDarkMode} route={route} />
         )}
+        </div>
       </div>
     </>
   );
