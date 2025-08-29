@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { DataSet, DiagnosticResult, Station } from "../types/subway";
-import { runDiagnostics, getQueryFlag } from "../utils/subwayUtils";
+import { runDiagnostics, getQueryFlag, findRoute, RouteResult, RouteMode } from "../utils/subwayUtils";
 import { loadSubwayDataFromFile } from "../utils/excelLoader";
-import { SubwayMap } from "./SubwayMap";
+import { SubwayMap, SubwayMapHandle } from "./SubwayMap";
 import { SettingsPanel } from "./SettingsPanel";
 import { SearchPanel } from "./SearchPanel";
+import { RoutePlanner } from "./RoutePlanner";
 
 export const KottcraftSubwayApp: React.FC = () => {
   const [data, setData] = useState<DataSet>({ stations: [], connections: [] });
@@ -18,6 +19,8 @@ export const KottcraftSubwayApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [highlightedStation, setHighlightedStation] = useState<Station | null>(null);
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const mapRef = useRef<SubwayMapHandle | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -70,6 +73,7 @@ export const KottcraftSubwayApp: React.FC = () => {
   const handleStationSelect = (station: Station) => {
     console.log('Station selected in main app:', station.name);
     setHighlightedStation(station);
+    setRoute(null);
     const url = new URL(window.location.href);
     url.searchParams.set('station', station.name);
     // Ensure any legacy params are removed
@@ -141,6 +145,23 @@ export const KottcraftSubwayApp: React.FC = () => {
         onStationSelect={handleStationSelect}
       />
 
+      <RoutePlanner
+        stations={data.stations}
+        isDarkMode={isDarkMode}
+        route={route}
+        onPlan={(start: string, end: string, mode: RouteMode) => {
+          const r = findRoute(start, end, data.connections, data.stations, mode);
+          setRoute(r);
+          if (r) {
+            // Optionally fit route into view without resetting to a single station
+            mapRef.current?.fitRouteToView(r);
+          }
+        }}
+        onClear={() => {
+          setRoute(null);
+        }}
+      />
+
       <SettingsPanel
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
@@ -153,14 +174,17 @@ export const KottcraftSubwayApp: React.FC = () => {
       />
 
       <SubwayMap
+        ref={mapRef}
         data={data}
         isDarkMode={isDarkMode}
         labelSize={labelSize}
         nodeSize={nodeSize}
         strokeWidth={strokeWidth}
         highlightedStation={highlightedStation}
+        route={route}
         onClearHighlight={() => {
           setHighlightedStation(null);
+          setRoute(null);
           const url = new URL(window.location.href);
           url.searchParams.delete('station');
           url.searchParams.delete('x');

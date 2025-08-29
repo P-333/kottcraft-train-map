@@ -116,6 +116,26 @@ src/
 - **Linting**: `npm run lint`
 - **Development**: `npm run dev`
 
+## Deploying to Cloudflare Pages (Static)
+
+This project is configured for a static export suitable for Cloudflare Pages:
+
+- Build command: `npm run build`
+- Build output directory: `out`
+
+Steps:
+1. Push this repository to GitHub/GitLab.
+2. In Cloudflare Dashboard → Workers & Pages → Create application → Pages → Connect to Git.
+3. Select the repo.
+4. Framework preset: Next.js
+5. Build command: `npm run build`
+6. Build output directory: `out`
+7. Set environment variable `NODE_VERSION` to 20 (or add a `.node-version` file with `20`).
+
+Notes:
+- Static export serves files from `out/`. Client data loading fetches `/subway_data.xlsx` from `public/` copied during export.
+- If you later need SSR or API routes, switch to Cloudflare Pages Full-stack using `@cloudflare/next-on-pages`.
+
 ## Troubleshooting
 
 - **No Data Displayed**: Ensure `subway_data.xlsx` exists in the `public` folder

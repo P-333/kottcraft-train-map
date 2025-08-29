@@ -114,3 +114,113 @@ export function runDiagnostics(): DiagnosticResult[] {
   
   return results;
 } 
+
+export interface RouteStep {
+  from: string;
+  to: string;
+  line: string;
+}
+
+export interface RouteResult {
+  steps: RouteStep[];
+  distance: number; // number of hops including transfers
+}
+
+export type RouteMode = "hops" | "distance";
+
+interface NeighborEdge {
+  station: string;
+  line: string;
+}
+
+/**
+ * Build adjacency list for stations with line labels.
+ */
+function buildAdjacency(connections: Connection[]): Map<string, NeighborEdge[]> {
+  const graph = new Map<string, NeighborEdge[]>();
+  const push = (a: string, b: string, line: string) => {
+    if (!graph.has(a)) graph.set(a, []);
+    graph.get(a)!.push({ station: b, line });
+  };
+  for (const c of connections) {
+    push(c.from, c.to, c.line);
+    push(c.to, c.from, c.line);
+  }
+  return graph;
+}
+
+/**
+ * Find a route between two stations minimizing hops and with a small transfer penalty.
+ * Uses Dijkstra with unit edge weights and +0.2 penalty when line changes.
+ */
+export function findRoute(
+  start: string,
+  goal: string,
+  connections: Connection[],
+  stations: Station[],
+  mode: RouteMode = "hops",
+  transferPenalty = 0.2
+): RouteResult | null {
+  if (start === goal) return { steps: [], distance: 0 };
+  const graph = buildAdjacency(connections);
+  if (!graph.has(start) || !graph.has(goal)) return null;
+  const stationByName = indexStations(stations);
+
+  const dist = new Map<string, number>();
+  const prev = new Map<string, { node: string; line: string } | null>();
+  const prevLine = new Map<string, string | null>();
+
+  const cmp = (a: [string, number], b: [string, number]) => a[1] - b[1];
+  const pq: [string, number][] = [];
+
+  for (const node of graph.keys()) {
+    dist.set(node, Infinity);
+    prev.set(node, null);
+    prevLine.set(node, null);
+  }
+  dist.set(start, 0);
+  pq.push([start, 0]);
+
+  while (pq.length) {
+    // simple priority queue pop
+    pq.sort(cmp);
+    const [u, d] = pq.shift()!;
+    if (d !== dist.get(u)) continue;
+    if (u === goal) break;
+    const neighbors = graph.get(u)!;
+    for (const { station: v, line } of neighbors) {
+      const currentLine = prevLine.get(u);
+      const penalty = currentLine && currentLine !== line ? transferPenalty : 0;
+      let edgeCost = 1;
+      if (mode === "distance") {
+        const su = stationByName.get(u);
+        const sv = stationByName.get(v);
+        if (!su || !sv) continue;
+        const dx = sv.x - su.x;
+        const dy = sv.y - su.y;
+        edgeCost = Math.sqrt(dx * dx + dy * dy);
+      }
+      const alt = d + edgeCost + penalty;
+      if (alt < (dist.get(v) ?? Infinity)) {
+        dist.set(v, alt);
+        prev.set(v, { node: u, line });
+        prevLine.set(v, line);
+        pq.push([v, alt]);
+      }
+    }
+  }
+
+  if (!isFinite(dist.get(goal) ?? Infinity)) return null;
+
+  // reconstruct steps
+  const steps: RouteStep[] = [];
+  let cur: string | undefined = goal;
+  while (cur && cur !== start) {
+    const p = prev.get(cur);
+    if (!p) break;
+    steps.push({ from: p.node, to: cur, line: p.line });
+    cur = p.node;
+  }
+  steps.reverse();
+  return { steps, distance: steps.length };
+}

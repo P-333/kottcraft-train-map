@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import * as d3 from "d3";
 import { DataSet, Station } from "../types/subway";
+import { RouteResult } from "../utils/subwayUtils";
 import { 
   autoColor, 
   stationLines, 
@@ -17,23 +18,32 @@ interface SubwayMapProps {
   nodeSize: number;
   strokeWidth: number;
   highlightedStation: Station | null;
+  route?: RouteResult | null;
   onClearHighlight: () => void;
 }
 
-export const SubwayMap: React.FC<SubwayMapProps> = ({
+export interface SubwayMapHandle {
+  fitRouteToView: (route: RouteResult) => void;
+}
+
+export const SubwayMap = forwardRef<SubwayMapHandle, SubwayMapProps>(({ 
   data,
   isDarkMode,
   labelSize,
   nodeSize,
   strokeWidth,
   highlightedStation,
+  route,
   onClearHighlight
-}) => {
+}, ref) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [viewportCenter, setViewportCenter] = useState({ x: 0, y: 0 });
   const [zoomReady, setZoomReady] = useState(false);
+  const pendingFitRef = useRef<RouteResult | null>(null);
+  const onClearRef = useRef(onClearHighlight);
+  useEffect(() => { onClearRef.current = onClearHighlight; }, [onClearHighlight]);
 
   const stationIndex = indexStations(data.stations);
   const lines = Array.from(new Set(data.connections.map((c) => c.line))).sort();
@@ -52,6 +62,83 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
       .translate(-x - 700, -y - 120);
     svg.transition().duration(800).call(zoomRef.current.transform, transform);
   };
+
+  const fitBounds = (minX: number, minY: number, maxX: number, maxY: number) => {
+    if (!svgRef.current || !zoomRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const rect = svgRef.current.getBoundingClientRect();
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+    const pad = Math.max(width, height) * 0.2 + 120;
+    // Compute zoom k relative to base identity scale (which maps viewBox -> viewport)
+    let scale = Math.min(
+      extent.width / (width + pad),
+      extent.height / (height + pad)
+    );
+    // Zoom in a bit more than a tight fit
+    scale *= 1.75;
+    if (!isFinite(scale) || scale <= 0) scale = 1;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const transform = d3.zoomIdentity
+      .translate(rect.width / 2, rect.height / 2)
+      .scale(Math.max(0.05, Math.min(200, scale)))
+      .translate(-(cx + 1300), -(cy + 200));
+    svg.transition().duration(700).call(zoomRef.current.transform, transform);
+  };
+
+  useImperativeHandle(ref, () => ({
+    fitRouteToView: (r: RouteResult) => {
+      if (!r || r.steps.length === 0) return;
+      if (!svgRef.current || !zoomRef.current || !zoomReady) {
+        pendingFitRef.current = r;
+        return;
+      }
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const step of r.steps) {
+        const a = stationIndex.get(step.from);
+        const b = stationIndex.get(step.to);
+        if (a) {
+          minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
+          minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
+        }
+        if (b) {
+          minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
+          minY = Math.min(minY, b.y); maxY = Math.max(maxY, b.y);
+        }
+      }
+      if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+        fitBounds(minX, minY, maxX, maxY);
+      }
+    }
+  }));
+
+  // If a fit was requested before zoom was ready, perform it now
+  useEffect(() => {
+    if (!zoomReady) return;
+    if (!pendingFitRef.current) return;
+    const r = pendingFitRef.current;
+    pendingFitRef.current = null;
+    if (!r || r.steps.length === 0) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const step of r.steps) {
+      const a = stationIndex.get(step.from);
+      const b = stationIndex.get(step.to);
+      if (a) {
+        minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
+        minY = Math.min(minY, a.y); maxY = Math.max(maxY, a.y);
+      }
+      if (b) {
+        minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
+        minY = Math.min(minY, b.y); maxY = Math.max(maxY, b.y);
+      }
+    }
+    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+      fitBounds(minX, minY, maxX, maxY);
+    }
+  }, [zoomReady]);
+
+  // Note: fitting to route is exposed via imperative handle; not auto-applied
 
   // D3 zoom setup
   useEffect(() => {
@@ -89,7 +176,7 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
         zoomRef.current && svg.transition().duration(160).call(zoomRef.current.scaleBy, 1 / 1.5);
       } else if (e.key.toLowerCase() === "0") {
         zoomRef.current && svg.transition().duration(160).call(zoomRef.current.transform, d3.zoomIdentity);
-        onClearHighlight();
+        onClearRef.current && onClearRef.current();
       }
     };
     
@@ -100,7 +187,7 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
       window.removeEventListener("keydown", onKey);
       setZoomReady(false);
     };
-  }, [data, onClearHighlight]);
+  }, [data]);
 
   // Auto-zoom to highlighted station once zoom is ready
   useEffect(() => {
@@ -234,16 +321,21 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
                   if (!a || !b) return null;
                   
                   const d = `M${a.x},${a.y} L${b.x},${b.y}`;
+                  const isInRoute = !!route?.steps.find((s) =>
+                    (s.from === edge.from && s.to === edge.to && s.line === edge.line) ||
+                    (s.from === edge.to && s.to === edge.from && s.line === edge.line)
+                  );
                   
                   return (
                     <path
                       key={`${edge.from}-${edge.to}-${idx}`}
                       d={d}
                       fill="none"
-                      stroke={color}
-                      strokeWidth={strokeWidth}
+                      stroke={isInRoute ? "#f59e0b" : color}
+                      strokeWidth={isInRoute ? strokeWidth + 2 : strokeWidth}
                       strokeLinejoin="round"
                       strokeLinecap="round"
+                      opacity={route ? (isInRoute ? 1 : 0.25) : 1}
                     />
                   );
                 })}
@@ -255,16 +347,17 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
           {data.stations.map((station) => {
             const isHub = stationLines(station.name, data.connections).size > 1;
             const isHighlighted = highlightedStation?.name === station.name;
+            const isOnRoute = !!route?.steps.find((s) => s.from === station.name || s.to === station.name);
             
             return (
               <g key={station.name}>
                 <circle
                   cx={station.x}
                   cy={station.y}
-                  r={nodeSize + (isHub ? 3 : 2) + (isHighlighted ? 4 : 0)}
-                  fill={isHighlighted ? "#fbbf24" : nodeFillColor}
-                  stroke={isHighlighted ? "#d97706" : nodeStrokeColor}
-                  strokeWidth={isHighlighted ? 3 : 1}
+                  r={nodeSize + (isHub ? 3 : 2) + (isHighlighted ? 4 : 0) + (isOnRoute ? 2 : 0)}
+                  fill={isHighlighted ? "#fbbf24" : (isOnRoute ? "#fde68a" : nodeFillColor)}
+                  stroke={isHighlighted ? "#d97706" : (isOnRoute ? "#f59e0b" : nodeStrokeColor)}
+                  strokeWidth={isHighlighted ? 3 : (isOnRoute ? 2 : 1)}
                   filter="url(#nodeShadow)"
                 />
                 <text
@@ -272,8 +365,8 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
                   y={station.y - 8}
                   fontSize={labelSize}
                   fontFamily="Inter, system-ui, sans-serif"
-                  fill={isHighlighted ? "#fbbf24" : textColor}
-                  fontWeight={isHighlighted ? "bold" : "normal"}
+                  fill={isHighlighted ? "#fbbf24" : (isOnRoute ? "#fbbf24" : textColor)}
+                  fontWeight={isHighlighted || isOnRoute ? "bold" : "normal"}
                 >
                   {station.name}
                 </text>
@@ -284,4 +377,4 @@ export const SubwayMap: React.FC<SubwayMapProps> = ({
       </svg>
     </div>
   );
-}; 
+});
