@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kottcraft Subway Map
 
-## Getting Started
+A modern, interactive subway map visualization built with React, TypeScript, and D3.js. This application displays subway networks with stations and connections, featuring zoom controls, customizable styling, dark mode, search functionality, and automatic data loading from Excel files.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Interactive Map**: Zoom, pan, and navigate the subway network
+- **Dark Mode**: Toggle between light and dark themes
+- **Search Functionality**: Search and highlight stations on the map
+- **Automatic Data Loading**: Reads from Excel files in the public folder
+- **Customizable Styling**: Adjust node sizes, label sizes, and line widths
+- **Responsive Design**: Modern UI with Tailwind CSS
+- **TypeScript**: Fully typed for better development experience
+- **Keyboard Shortcuts**: Use +, -, and 0 keys for zoom controls
+
+## Setup
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Prepare Excel Data**: Create an Excel file named `subway_data.xlsx` in the `public` folder with two sheets:
+   
+   **Stations Sheet** (columns: Name, X, Z):
+   - Name: Station name
+   - X: X coordinate
+   - Z: Z coordinate
+   
+   **Connections Sheet** (columns: From, To, Line):
+   - From: Starting station name
+   - To: Destination station name
+   - Line: Line/route identifier
+
+3. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Open Browser**: Navigate to `http://localhost:3000`
+
+## Excel File Structure
+
+The application expects an Excel file with the following structure:
+
+### Stations Sheet
+| Name | X | Z |
+|------|---|----|
+| Central Station | 0 | 0 |
+| North Station | 100 | 50 |
+| South Station | 50 | -100 |
+
+### Connections Sheet
+| From | To | Line |
+|------|----|------|
+| Central Station | North Station | Red Line |
+| Central Station | South Station | Blue Line |
+
+## Controls
+
+- **Mouse Wheel**: Zoom in/out
+- **Mouse Drag**: Pan the map
+- **+ Key**: Zoom in
+- **- Key**: Zoom out
+- **0 Key**: Reset zoom
+- **Search Bar**: Type to search for stations
+- **Settings Panel**: Adjust visualization parameters
+- **Dark Mode Toggle**: Switch between light and dark themes
+
+## Search Functionality
+
+- **Search Bar**: Located at the top center of the screen
+- **Real-time Results**: Shows matching stations as you type
+- **Station Highlighting**: Selected stations are highlighted on the map
+- **Auto-zoom**: Map automatically centers and zooms in to selected stations (70x zoom for dramatic effect)
+- **Connection Info**: Shows which lines connect to each station
+- **Reset Zoom**: Click the reset zoom button (0) to return to overview and clear highlights
+
+## Dark Mode
+
+- **Toggle Switch**: Located in the settings panel (top-left)
+- **Automatic Theming**: All UI elements adapt to the selected theme
+- **Smooth Transitions**: Color changes are animated for better UX
+- **Persistent**: Theme preference is maintained during the session
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── KottcraftSubwayApp.tsx    # Main application component
+│   ├── SubwayMap.tsx             # Map visualization component
+│   ├── SettingsPanel.tsx         # Settings controls
+│   └── SearchPanel.tsx           # Search functionality
+├── types/
+│   └── subway.ts                 # TypeScript interfaces
+├── utils/
+│   ├── subwayUtils.ts            # Utility functions
+│   └── excelLoader.ts            # Excel data loading
+└── app/
+    └── page.tsx                  # Main page
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Technologies Used
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **React 19**: Modern React with hooks
+- **TypeScript**: Type-safe development
+- **D3.js**: Data visualization and zoom behavior
+- **Tailwind CSS**: Utility-first CSS framework
+- **Next.js 15**: React framework with App Router
+- **XLSX**: Excel file parsing
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Development
 
-## Learn More
+- **Type Checking**: `npm run build`
+- **Linting**: `npm run lint`
+- **Development**: `npm run dev`
 
-To learn more about Next.js, take a look at the following resources:
+## Troubleshooting
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **No Data Displayed**: Ensure `subway_data.xlsx` exists in the `public` folder
+- **Excel Format**: Verify sheets are named "Stations" and "Connections"
+- **Column Headers**: Column names should match the expected format (case-insensitive)
+- **Debug Mode**: Add `?debug=1` to the URL to see diagnostic information
+- **File Location**: Excel file must be in the `public` folder, not the root folder
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Sample Data
 
-## Deploy on Vercel
+A sample CSV file (`sample_subway_data.csv`) is provided in the root folder. You can convert this to Excel format using any spreadsheet application to test the application.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Recent Changes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- ✅ **Added Dark Mode**: Toggle between light and dark themes
+- ✅ **Added Search Functionality**: Search and highlight stations with enhanced zoom
+- ✅ **Auto-center on Centralplan**: Map automatically centers on Centralplan station by default
+- ✅ **Enhanced Zoom**: Search results zoom in closer (3x) for better station visibility
+- ✅ **Reset Functionality**: Reset zoom button clears highlights and returns to overview
+- ✅ **Removed Octolinear Routes**: Simplified to straight-line connections
+- ✅ **Improved UI**: Better responsive design and accessibility
+- ✅ **Enhanced UX**: Smooth transitions and better visual feedback
