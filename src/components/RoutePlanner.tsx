@@ -30,21 +30,39 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   return (
     <>
-      <button
-        aria-label={isOpen ? "Hide route planner" : "Show route planner"}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed right-4 top-1/2 -translate-y-1/2 z-30 px-3 py-2 rounded-md border shadow-sm font-medium transition-colors ${
-          isDarkMode
-            ? 'bg-gray-800/90 hover:bg-gray-700 border-gray-600 text-gray-200'
-            : 'bg-white/90 hover:bg-white border-gray-300 text-gray-700'
-        }`}
-      >
-        {isOpen ? 'Close' : 'Route'}
-      </button>
+      {!isOpen && (
+        <button
+          aria-label="Expand route planner"
+          onClick={() => setIsOpen(true)}
+          className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 w-11 h-32 rounded-l-md border shadow-sm flex items-center justify-center ${
+            isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white/95 border-gray-300 text-gray-700 hover:bg-gray-100'
+          }`}
+          style={{ writingMode: 'vertical-rl' }}
+        >
+          Route
+        </button>
+      )}
 
-      <div className={`fixed top-1/2 right-4 -translate-y-1/2 z-30 w-[380px] max-w-[92vw] rounded-lg border shadow-lg transition-all duration-200 ${
-        isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-300 text-gray-800'
-      } ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0 pointer-events-none'}`}>
+      <div
+        className={`fixed top-1/2 right-0 z-30 w-[380px] max-w-[92vw] -translate-y-1/2 rounded-l-lg border shadow-lg transition-transform duration-200 ${
+          isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-100' : 'bg-white/95 border-gray-300 text-gray-800'
+        }`}
+        style={{ transform: `translateY(-50%) translateX(${isOpen ? '0' : '100%'})` }}
+        aria-expanded={isOpen}
+      >
+        {/* Flap handle when open */}
+        {isOpen && (
+          <button
+            aria-label="Collapse route planner"
+            onClick={() => setIsOpen(false)}
+            className={`absolute left-[-44px] top-1/2 -translate-y-1/2 w-11 h-32 rounded-l-md border shadow-sm flex items-center justify-center ${
+              isDarkMode ? 'bg-gray-800/95 border-gray-700 text-gray-200 hover:bg-gray-700' : 'bg-white/95 border-gray-300 text-gray-700 hover:bg-gray-100'
+            }`}
+            style={{ writingMode: 'vertical-rl' }}
+          >
+            Route
+          </button>
+        )}
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <div className={`text-sm font-semibold ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>Route planner</div>
@@ -121,23 +139,95 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
         </div>
 
         {route && (
-          <div className={`border-t px-4 py-3 text-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="font-semibold mb-2">Route Steps</div>
-            {route.steps.length === 0 ? (
-              <div className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Start and destination are the same.</div>
-            ) : (
-              <ol className="list-decimal list-inside space-y-1">
-                {route.steps.map((s, i) => (
-                  <li key={`${s.from}-${s.to}-${i}`}>
-                    {s.from} → {s.to} <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>({s.line})</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
+          <LegList isDarkMode={isDarkMode} route={route} />
         )}
       </div>
     </>
+  );
+};
+
+interface LegListProps {
+  isDarkMode: boolean;
+  route: RouteResult;
+}
+
+const LegList: React.FC<LegListProps> = ({ isDarkMode, route }) => {
+  const legs = useMemo(() => {
+    type Leg = { line: string; stations: string[] };
+    const res: Leg[] = [];
+    if (!route.steps.length) return res;
+    let currentLine = route.steps[0].line;
+    let stations: string[] = [route.steps[0].from, route.steps[0].to];
+    for (let i = 1; i < route.steps.length; i++) {
+      const step = route.steps[i];
+      if (step.line === currentLine) {
+        if (stations[stations.length - 1] !== step.to) stations.push(step.to);
+      } else {
+        res.push({ line: currentLine, stations });
+        currentLine = step.line;
+        const start = stations[stations.length - 1] === step.from ? step.from : step.from;
+        stations = [start, step.to];
+      }
+    }
+    res.push({ line: currentLine, stations });
+    return res;
+  }, [route]);
+
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const toggle = (idx: number) => {
+    setExpanded(prev => {
+      const s = new Set(prev);
+      if (s.has(idx)) s.delete(idx); else s.add(idx);
+      return s;
+    });
+  };
+
+  return (
+    <div className={`border-t px-4 py-3 text-sm ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+      <div className="font-semibold mb-2">Route</div>
+      {route.steps.length === 0 ? (
+        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Start and destination are the same.</div>
+      ) : (
+        <div className="space-y-2">
+          {legs.map((leg, i) => {
+            const start = leg.stations[0];
+            const end = leg.stations[leg.stations.length - 1];
+            const numStops = leg.stations.length - 1;
+            const isOpen = expanded.has(i);
+            const transferAt = i < legs.length - 1 ? end : null;
+            const nextLine = i < legs.length - 1 ? legs[i + 1].line : null;
+            return (
+              <div key={`${leg.line}-${i}`} className={`rounded-md ${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <button
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+                  onClick={() => toggle(i)}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">{start} → {end}</div>
+                    <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{leg.line} • {numStops} stop{numStops !== 1 ? 's' : ''}</div>
+                  </div>
+                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{isOpen ? 'Hide details' : 'Show details'}</span>
+                </button>
+                {isOpen && (
+                  <div className={`px-3 pb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <ol className="list-decimal list-inside space-y-1">
+                      {leg.stations.map((s, j) => (
+                        <li key={`${s}-${j}`}>{s}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+                {transferAt && nextLine && (
+                  <div className={`px-3 py-2 text-xs border-t ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-600'}`}>
+                    Transfer at <span className="font-medium">{transferAt}</span> to <span className="font-medium">{nextLine}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
 

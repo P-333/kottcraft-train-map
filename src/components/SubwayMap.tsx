@@ -75,15 +75,31 @@ export const SubwayMap = forwardRef<SubwayMapHandle, SubwayMapProps>(({
       extent.width / (width + pad),
       extent.height / (height + pad)
     );
-    // Zoom in a bit more than a tight fit
-    scale *= 1.75;
+    // Dynamic zoom boost based on route span: short routes zoom in, long routes zoom out slightly
+    const span = Math.max(width, height);
+    const tZoom = Math.min(1, span / 3000); // 0 for short, 1 for very long
+    const boost = 1.35 - 0.45 * tZoom; // 1.35 (short) -> 0.90 (long)
+    scale *= boost;
     if (!isFinite(scale) || scale <= 0) scale = 1;
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
+    // Compute dynamic divisors based on span to bias center without over/under-shoot
+    const spanX = Math.max(1, maxX - minX);
+    const spanY = Math.max(1, maxY - minY);
+    const divXMax = 8, divXMin = 3; // small span -> bigger divisor (smaller push)
+    const divYMax = 6, divYMin = 2.5;
+    const tx = Math.min(1, spanX / 3000);
+    const ty = Math.min(1, spanY / 2000);
+    const divX = divXMax - tx * (divXMax - divXMin);
+    const divY = divYMax - ty * (divYMax - divYMin);
+    const baseX = 1700, baseY = 200;
+    const offX = baseX + spanX / divX;
+    const offY = baseY + spanY / divY;
+
     const transform = d3.zoomIdentity
       .translate(rect.width / 2, rect.height / 2)
       .scale(Math.max(0.05, Math.min(200, scale)))
-      .translate(-(cx + 1300), -(cy + 200));
+      .translate(-(cx + offX + 1000), -(cy + offY + 100));
     svg.transition().duration(700).call(zoomRef.current.transform, transform);
   };
 
@@ -378,3 +394,5 @@ export const SubwayMap = forwardRef<SubwayMapHandle, SubwayMapProps>(({
     </div>
   );
 });
+
+SubwayMap.displayName = "SubwayMap";
