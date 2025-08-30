@@ -72,7 +72,7 @@ export const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 onClick={() => setMode("hops")}
                 className={`px-3 py-1 rounded-md border text-sm ${mode === 'hops' ? (isDarkMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-blue-600 border-blue-600 text-white') : (isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-300' : 'bg-white border-gray-300 text-gray-700')}`}
               >
-                Fewest stops
+                Fewest transfers
               </button>
               <button
                 onClick={() => setMode("distance")}
@@ -196,10 +196,21 @@ const LegList: React.FC<LegListProps> = ({ isDarkMode, route }) => {
             const end = leg.stations[leg.stations.length - 1];
             const numStops = leg.stations.length - 1;
             const isOpen = expanded.has(i);
-            const transferAt = i < legs.length - 1 ? end : null;
-            const nextLine = i < legs.length - 1 ? legs[i + 1].line : null;
+            // Transfer info should be shown ABOVE the next leg, not under the previous
+            const transferFromPrevAt = i > 0 ? legs[i - 1].stations[legs[i - 1].stations.length - 1] : null;
+            const towards = leg.stations.length > 1 ? leg.stations[1] : null;
             return (
               <div key={`${leg.line}-${i}`} className={`rounded-md ${isDarkMode ? 'bg-gray-900/60' : 'bg-gray-50'} border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                {transferFromPrevAt && (
+                  <div className={`px-3 py-2 text-xs border-b ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-600'}`}>
+                    Transfer at <span className="font-medium">{transferFromPrevAt}</span> to <span className="font-medium">{leg.line}</span>
+                    {towards && (
+                      <>
+                        {" "}towards <span className="font-medium">{towards}</span>
+                      </>
+                    )}
+                  </div>
+                )}
                 <button
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                   onClick={() => toggle(i)}
@@ -217,11 +228,6 @@ const LegList: React.FC<LegListProps> = ({ isDarkMode, route }) => {
                         <li key={`${s}-${j}`}>{s}</li>
                       ))}
                     </ol>
-                  </div>
-                )}
-                {transferAt && nextLine && (
-                  <div className={`px-3 py-2 text-xs border-t ${isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-600'}`}>
-                    Transfer at <span className="font-medium">{transferAt}</span> to <span className="font-medium">{nextLine}</span>
                   </div>
                 )}
               </div>

@@ -150,8 +150,9 @@ function buildAdjacency(connections: Connection[]): Map<string, NeighborEdge[]> 
 }
 
 /**
- * Find a route between two stations minimizing hops and with a small transfer penalty.
- * Uses Dijkstra with unit edge weights and +0.2 penalty when line changes.
+ * Find a route between two stations.
+ * - mode="hops": minimize transfers first, then total stops (lexicographic).
+ * - mode="distance": minimize geometric distance with a small transfer penalty.
  */
 export function findRoute(
   start: string,
@@ -190,15 +191,22 @@ export function findRoute(
     const neighbors = graph.get(u)!;
     for (const { station: v, line } of neighbors) {
       const currentLine = prevLine.get(u);
-      const penalty = currentLine && currentLine !== line ? transferPenalty : 0;
+      let penalty = 0;
       let edgeCost = 1;
       if (mode === "distance") {
+        // distance mode: geometric distance + small transfer penalty
         const su = stationByName.get(u);
         const sv = stationByName.get(v);
         if (!su || !sv) continue;
         const dx = sv.x - su.x;
         const dy = sv.y - su.y;
         edgeCost = Math.sqrt(dx * dx + dy * dy);
+        penalty = currentLine && currentLine !== line ? transferPenalty : 0;
+      } else {
+        // hops mode: minimize transfers first, then number of stops
+        const maxStops = stations.length + 1;
+        penalty = currentLine && currentLine !== line ? maxStops : 0;
+        edgeCost = 1; // stop count as tiebreaker
       }
       const alt = d + edgeCost + penalty;
       if (alt < (dist.get(v) ?? Infinity)) {
